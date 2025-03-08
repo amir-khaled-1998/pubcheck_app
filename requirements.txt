@@ -1,0 +1,10 @@
+Flask
+Flask-Login
+Werkzeug
+facebook-business
+beautifulsoup4
+requests
+datetime
+json5
+sqlite3
+functools
