@@ -7,4 +7,4 @@ requests==2.32.3
 requests-file==1.5.1
 requests-toolbelt==1.0.0
 json5==0.9.6
-sqlite3==3.7.15
+sqlite==3.45.3
