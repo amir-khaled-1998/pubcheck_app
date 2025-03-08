@@ -1,0 +1,197 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vérification des Publicités Facebook</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header avec navigation -->
+        <header class="flex justify-between items-center mb-8 bg-white p-4 rounded-lg shadow">
+            <h1 class="text-2xl font-bold">Vérification des Publicités Facebook</h1>
+            <nav>
+                <ul class="flex space-x-4">
+                    <li class="text-gray-600">Connecté en tant que: {{ current_user.username }}</li>
+                    {% if current_user.is_admin %}
+                    <li><a href="{{ url_for('admin_users') }}" class="text-blue-600 hover:text-blue-800">Admin</a></li>
+                    {% endif %}
+                    <li><a href="{{ url_for('logout') }}" class="text-red-600 hover:text-red-800">Déconnexion</a></li>
+                </ul>
+            </nav>
+        </header>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="p-4 mb-4 rounded-md {% if category == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <!-- Formulaire de connexion -->
+        <div id="connexion-form" class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4">Configuration Facebook API</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Access Token</label>
+                    <input type="text" id="access-token" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">ID du Compte</label>
+                    <input type="text" id="compte-id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <button id="connecter" class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Connecter
+                </button>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div id="actions" class="max-w-md mx-auto mb-8 hidden">
+            <button id="scanner" class="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                Scanner les publicités
+            </button>
+        </div>
+
+        <!-- Résultats -->
+        <div id="resultats" class="hidden">
+            <h2 class="text-2xl font-semibold mb-4">Résultats</h2>
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <div class="p-4">
+                    <p id="total-ads" class="text-lg font-medium"></p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nom</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Statut</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Problèmes</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultats-body" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center">
+            <div class="bg-white p-4 rounded-lg">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                <p class="mt-2">Chargement en cours...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const loading = document.getElementById('loading');
+            const connexionForm = document.getElementById('connexion-form');
+            const actions = document.getElementById('actions');
+            const resultats = document.getElementById('resultats');
+            
+            // Connexion
+            document.getElementById('connecter').addEventListener('click', async function() {
+                const accessToken = document.getElementById('access-token').value;
+                const compteId = document.getElementById('compte-id').value;
+                
+                if (!accessToken || !compteId) {
+                    alert('Veuillez remplir tous les champs');
+                    return;
+                }
+                
+                loading.classList.remove('hidden');
+                
+                try {
+                    const response = await fetch('/api/initialize', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            access_token: accessToken,
+                            compte_id: compteId
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        connexionForm.classList.add('hidden');
+                        actions.classList.remove('hidden');
+                    } else {
+                        alert('Erreur de connexion: ' + data.error);
+                    }
+                } catch (error) {
+                    alert('Erreur: ' + error);
+                } finally {
+                    loading.classList.add('hidden');
+                }
+            });
+            
+            // Scanner
+            document.getElementById('scanner').addEventListener('click', async function() {
+                loading.classList.remove('hidden');
+                resultats.classList.add('hidden');
+                
+                try {
+                    const response = await fetch('/api/scan', {
+                        method: 'POST'
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        document.getElementById('total-ads').textContent = 
+                            `Total des publicités analysées: ${data.total}`;
+                        
+                        const tbody = document.getElementById('resultats-body');
+                        tbody.innerHTML = '';
+                        
+                        data.resultats.forEach(pub => {
+                            const tr = document.createElement('tr');
+                            
+                            const problemes = [];
+                            if (pub.verification.est_404) problemes.push('404');
+                            if (pub.verification.rupture_stock) problemes.push('Rupture de stock');
+                            if (pub.verification.message_erreur) problemes.push('Erreur: ' + pub.verification.message_erreur);
+                            
+                            tr.innerHTML = `
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${pub.id_publicite}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${pub.nom}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${pub.statut}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-red-500">${problemes.join(', ') || 'Aucun'}</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <a href="${pub.lien_produit}" target="_blank" class="text-blue-600 hover:text-blue-900">Voir le produit</a>
+                                    ${pub.lien_apercu ? `
+                                        | <a href="${pub.lien_apercu}" target="_blank" class="text-blue-600 hover:text-blue-900">Voir la pub</a>
+                                    ` : ''}
+                                </td>
+                            `;
+                            
+                            tbody.appendChild(tr);
+                        });
+                        
+                        resultats.classList.remove('hidden');
+                    } else {
+                        alert('Erreur lors du scan: ' + data.error);
+                    }
+                } catch (error) {
+                    alert('Erreur: ' + error);
+                } finally {
+                    loading.classList.add('hidden');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
